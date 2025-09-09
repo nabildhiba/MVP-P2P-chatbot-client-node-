@@ -22,7 +22,7 @@ const configText = await fsp.readFile(new URL('./config.yaml', import.meta.url),
 const config = parse(configText)
 
 const bootstrappers = [process.env.BOOTSTRAP_ADDR].filter(Boolean)
-const port = process.env.PORT || 0
+const port = process.env.PORT || config.port || 55781
 
 const libp2p = await createLibp2p({
   addresses: {

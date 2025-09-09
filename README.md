@@ -13,7 +13,7 @@ Ce projet contient deux packages Node.js utilisant [libp2p](https://libp2p.io/) 
 
 ## Variables d'environnement
 
-- `PORT` : port d'écoute du démon. S'il n'est pas défini, un port libre aléatoire est choisi. Le client utilise également cette valeur pour se connecter au démon local lorsque `AI_TORRENT_ADDR` n'est pas fournie.
+- `PORT` : port d'écoute du démon. Par défaut, le démon utilise le port configuré dans `node/config.yaml` (55781). Pour choisir un port stable, définissez cette variable avant de lancer le démon, par exemple : `PORT=60000 npm run start --prefix node`. Le client utilise également cette valeur pour se connecter au démon local lorsque `AI_TORRENT_ADDR` n'est pas fournie.
 - `AI_TORRENT_ADDR` : adresse explicite du fournisseur. Ignorée si l'option `--discover` est utilisée.
 
 ## Démarrage rapide

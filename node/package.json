@@ -12,6 +12,7 @@
     "@libp2p/webrtc": "*",
     "@libp2p/websockets": "*",
     "@libp2p/mplex": "*",
+    "@libp2p/identify": "*",
     "yaml": "*"
   }
 }

@@ -5,6 +5,7 @@ import { webSockets } from '@libp2p/websockets'
 import { webRTC } from '@libp2p/webrtc'
 import { mplex } from '@libp2p/mplex'
 import { kadDHT } from '@libp2p/kad-dht'
+import { identifyService } from '@libp2p/identify'
 
 const prompt = process.argv.slice(2).join(' ')
 const params = {}
@@ -13,7 +14,8 @@ const libp2p = await createLibp2p({
   transports: [webSockets(), webRTC()],
   streamMuxers: [mplex()],
   connectionEncryption: [noise()],
-  dht: kadDHT()
+  dht: kadDHT(),
+  services: { identify: identifyService() }
 })
 
 await libp2p.start()

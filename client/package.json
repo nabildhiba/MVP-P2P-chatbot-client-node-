@@ -11,6 +11,7 @@
     "@libp2p/identify": "*",
     "@libp2p/kad-dht": "*",
     "@libp2p/mplex": "*",
+    "@libp2p/mdns": "*",
     "@libp2p/webrtc": "*",
     "@libp2p/websockets": "*",
     "libp2p": "*"

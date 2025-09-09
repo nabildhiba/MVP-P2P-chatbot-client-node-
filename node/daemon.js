@@ -9,6 +9,7 @@ import fs from 'node:fs/promises'
 import { parse } from 'yaml'
 import { generate } from './inference.js'
 import { circuitRelayTransport, circuitRelayServer } from '@libp2p/circuit-relay-v2'
+import { mdns } from '@libp2p/mdns'
 
 const configText = await fs.readFile(new URL('./config.yaml', import.meta.url), 'utf8')
 const config = parse(configText)
@@ -18,6 +19,7 @@ const libp2p = await createLibp2p({
   streamMuxers: [mplex()],
   connectionEncryption: [noise()],
   dht: kadDHT(),
+  peerDiscovery: [mdns()],
   services: {
     identify: identify(),
     relay: circuitRelayServer()

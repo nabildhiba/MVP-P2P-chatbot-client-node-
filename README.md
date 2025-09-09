@@ -26,4 +26,16 @@ npm run start --prefix node
 npm run ask --prefix client -- "Bonjour, qui es-tu ?"
 ```
 
+## Configuration réseau
+
+Avant d'interroger le démon, le client doit rejoindre la même DHT qu'un pair connu.
+Indiquez l'adresse multiaddr du démon via la variable d'environnement `AI_TORRENT_ADDR` :
+
+```bash
+export AI_TORRENT_ADDR=/ip4/127.0.0.1/tcp/4513/ws
+```
+
+À défaut, le client tentera de contacter une adresse de bootstrap par défaut.
+Les paquets `client` et `node` utilisent aussi mDNS pour découvrir automatiquement les pairs locaux.
+
 Le démon doit avoir accès à une instance locale d'[Ollama](https://github.com/ollama/ollama) accessible sur `http://127.0.0.1:11434`.

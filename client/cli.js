@@ -7,6 +7,7 @@ import { mplex } from '@libp2p/mplex'
 import { kadDHT } from '@libp2p/kad-dht'
 import { identify  } from '@libp2p/identify'
 import { circuitRelayTransport, circuitRelayServer } from '@libp2p/circuit-relay-v2'
+import { mdns } from '@libp2p/mdns'
 
 
 const prompt = process.argv.slice(2).join(' ')
@@ -17,6 +18,7 @@ const libp2p = await createLibp2p({
   streamMuxers: [mplex()],
   connectionEncryption: [noise()],
   dht: kadDHT(),
+  peerDiscovery: [mdns()],
   services: {
     identify: identify(),
     relay: circuitRelayServer()
@@ -24,6 +26,19 @@ const libp2p = await createLibp2p({
 })
 
 await libp2p.start()
+
+const bootstrapPeers = process.env.AI_TORRENT_ADDR
+  ? [process.env.AI_TORRENT_ADDR]
+  : ['/ip4/127.0.0.1/tcp/4513/ws']
+
+for (const addr of bootstrapPeers) {
+  try {
+    await libp2p.dial(addr)
+    break
+  } catch (err) {
+    console.error(`could not dial ${addr}`, err)
+  }
+}
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()

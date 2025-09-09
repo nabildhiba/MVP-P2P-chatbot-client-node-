@@ -1,7 +1,7 @@
 import { createLibp2p } from 'libp2p'
 import { noise } from '@chainsafe/libp2p-noise'
 import { webSockets } from '@libp2p/websockets'
-import { webrtc } from '@libp2p/webrtc'
+import { webRTC } from '@libp2p/webrtc'
 import { mplex } from '@libp2p/mplex'
 import { kadDHT } from '@libp2p/kad-dht'
 import fs from 'node:fs/promises'
@@ -12,7 +12,7 @@ const configText = await fs.readFile(new URL('./config.yaml', import.meta.url), 
 const config = parse(configText)
 
 const libp2p = await createLibp2p({
-  transports: [webSockets(), webrtc()],
+  transports: [webSockets(), webRTC()],
   streamMuxers: [mplex()],
   connectionEncryption: [noise()],
   dht: kadDHT()

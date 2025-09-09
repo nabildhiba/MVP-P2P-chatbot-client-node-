@@ -5,6 +5,7 @@ import { webSockets } from '@libp2p/websockets'
 import { mplex } from '@libp2p/mplex'
 import { kadDHT } from '@libp2p/kad-dht'
 import { identify } from '@libp2p/identify'
+import { bootstrap } from '@libp2p/bootstrap'
 import { multiaddr } from '@multiformats/multiaddr'
 
 if (typeof Promise.withResolvers !== 'function') {
@@ -19,11 +20,14 @@ if (typeof Promise.withResolvers !== 'function') {
 const prompt = process.argv.slice(2).join(' ')
 const params = {}
 
+const bootstrappers = [process.env.BOOTSTRAP_ADDR].filter(Boolean)
+
 const libp2p = await createLibp2p({
   transports: [webSockets()],
   streamMuxers: [mplex()],
   connectionEncrypters: [noise()],
   dht: kadDHT(),
+  peerDiscovery: bootstrappers.length ? [bootstrap({ list: bootstrappers })] : [],
   services: {
     identify: identify()
   }

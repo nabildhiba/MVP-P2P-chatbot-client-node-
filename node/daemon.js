@@ -4,6 +4,7 @@ import { webSockets } from '@libp2p/websockets'
 import { mplex } from '@libp2p/mplex'
 import { kadDHT } from '@libp2p/kad-dht'
 import { identify } from '@libp2p/identify'
+import { bootstrap } from '@libp2p/bootstrap'
 import fs from 'node:fs/promises'
 import { parse } from 'yaml'
 import { generate } from './inference.js'
@@ -19,6 +20,8 @@ if (typeof Promise.withResolvers !== 'function') {
 const configText = await fs.readFile(new URL('./config.yaml', import.meta.url), 'utf8')
 const config = parse(configText)
 
+const bootstrappers = [process.env.BOOTSTRAP_ADDR].filter(Boolean)
+
 const libp2p = await createLibp2p({
   addresses: {
     listen: ['/ip4/0.0.0.0/tcp/0/ws']
@@ -27,6 +30,7 @@ const libp2p = await createLibp2p({
   streamMuxers: [mplex()],
   connectionEncrypters: [noise()],
   dht: kadDHT(),
+  peerDiscovery: bootstrappers.length ? [bootstrap({ list: bootstrappers })] : [],
   services: {
     identify: identify()
   }

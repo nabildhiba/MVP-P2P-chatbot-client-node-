@@ -7,6 +7,7 @@ import { kadDHT } from '@libp2p/kad-dht'
 import { identify } from '@libp2p/identify'
 import { bootstrap } from '@libp2p/bootstrap'
 import { multiaddr } from '@multiformats/multiaddr'
+import { readFileSync } from 'node:fs'
 
 if (typeof Promise.withResolvers !== 'function') {
   Promise.withResolvers = () => {
@@ -40,6 +41,13 @@ const decoder = new TextDecoder()
 const key = encoder.encode('ait:cap:mistral-q4')
 
 let addr = process.env.AI_TORRENT_ADDR
+if (!addr) {
+  try {
+    addr = readFileSync(new URL('./daemon.addr', import.meta.url), 'utf8').trim()
+  } catch (err) {
+    console.warn('Failed to read daemon address file:', err)
+  }
+}
 if (!addr) {
   try {
     const value = await libp2p.contentRouting.get(key)

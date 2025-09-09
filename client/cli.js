@@ -48,12 +48,12 @@ if (!addr) {
 
 let stream
 try {
-  ({ stream } = await libp2p.dialProtocol(multiaddr(addr), '/ai-torrent/1/generate'))
+  stream = await libp2p.dialProtocol(multiaddr(addr), '/ai-torrent/1/generate')
 } catch (err) {
   console.error('Failed to connect to provider:', err)
   process.exit(1)
 }
-if (stream == null) {
+if (!stream) {
   console.error('No stream returned from provider')
   process.exit(1)
 }

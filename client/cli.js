@@ -97,7 +97,8 @@ await stream.sink((async function* () {
 
 let buffer = ''
 for await (const chunk of stream.source) {
-  buffer += decoder.decode(chunk)
+  const data = chunk.subarray ? chunk.subarray() : chunk
+  buffer += decoder.decode(data)
   let index
   while ((index = buffer.indexOf('\n')) !== -1) {
     const line = buffer.slice(0, index)

@@ -2,7 +2,7 @@
 import { createLibp2p } from 'libp2p'
 import { noise } from '@chainsafe/libp2p-noise'
 import { webSockets } from '@libp2p/websockets'
-import { webrtc } from '@libp2p/webrtc'
+import { webRTC } from '@libp2p/webrtc'
 import { mplex } from '@libp2p/mplex'
 import { kadDHT } from '@libp2p/kad-dht'
 
@@ -10,7 +10,7 @@ const prompt = process.argv.slice(2).join(' ')
 const params = {}
 
 const libp2p = await createLibp2p({
-  transports: [webSockets(), webrtc()],
+  transports: [webSockets(), webRTC()],
   streamMuxers: [mplex()],
   connectionEncryption: [noise()],
   dht: kadDHT()

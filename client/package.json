@@ -1,0 +1,16 @@
+{
+  "name": "ai-torrent-client",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "ask": "node cli.js"
+  },
+  "dependencies": {
+    "libp2p": "*",
+    "@chainsafe/libp2p-noise": "*",
+    "@libp2p/kad-dht": "*",
+    "@libp2p/webrtc": "*",
+    "@libp2p/websockets": "*",
+    "@libp2p/mplex": "*"
+  }
+}

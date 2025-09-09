@@ -22,10 +22,11 @@ const configText = await fsp.readFile(new URL('./config.yaml', import.meta.url),
 const config = parse(configText)
 
 const bootstrappers = [process.env.BOOTSTRAP_ADDR].filter(Boolean)
+const port = process.env.PORT || 0
 
 const libp2p = await createLibp2p({
   addresses: {
-    listen: ['/ip4/0.0.0.0/tcp/0/ws']
+    listen: [`/ip4/0.0.0.0/tcp/${port}/ws`]
   },
   transports: [webSockets()],
   streamMuxers: [mplex()],

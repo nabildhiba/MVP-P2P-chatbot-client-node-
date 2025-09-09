@@ -14,6 +14,7 @@ Ce projet contient deux packages Node.js utilisant [libp2p](https://libp2p.io/) 
 ## Variables d'environnement
 
 - `PORT` : port d'écoute du démon. S'il n'est pas défini, un port libre aléatoire est choisi. Le client utilise également cette valeur pour se connecter au démon local lorsque `AI_TORRENT_ADDR` n'est pas fournie.
+- `AI_TORRENT_ADDR` : adresse explicite du fournisseur. Ignorée si l'option `--discover` est utilisée.
 
 ## Démarrage rapide
 
@@ -26,8 +27,10 @@ npm install --prefix node
 # lancement du démon
 npm run start --prefix node
 
-# envoi d'une requête
-npm run ask --prefix client -- "Bonjour, qui es-tu ?"
+# envoi d'une requête (découverte automatique)
+npm run ask --prefix client -- --discover "Bonjour, qui es-tu ?"
 ```
 
 Le démon doit avoir accès à une instance locale d'[Ollama](https://github.com/ollama/ollama) accessible sur `http://127.0.0.1:11434`.
+
+L'option `--discover` force le client à ignorer `AI_TORRENT_ADDR` et à découvrir l'adresse du fournisseur via le fichier `daemon.addr` ou la DHT.

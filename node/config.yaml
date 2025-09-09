@@ -1,0 +1,3 @@
+model: mistral
+maxConcurrent: 1
+announceKey: ait:cap:mistral-q4

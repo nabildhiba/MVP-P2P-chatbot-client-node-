@@ -1,0 +1,17 @@
+{
+  "name": "ai-torrent-node",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "start": "node daemon.js"
+  },
+  "dependencies": {
+    "libp2p": "*",
+    "@chainsafe/libp2p-noise": "*",
+    "@libp2p/kad-dht": "*",
+    "@libp2p/webrtc": "*",
+    "@libp2p/websockets": "*",
+    "@libp2p/mplex": "*",
+    "yaml": "*"
+  }
+}

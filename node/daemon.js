@@ -1,26 +1,34 @@
 import { createLibp2p } from 'libp2p'
 import { noise } from '@chainsafe/libp2p-noise'
 import { webSockets } from '@libp2p/websockets'
-import { webRTC } from '@libp2p/webrtc'
 import { mplex } from '@libp2p/mplex'
 import { kadDHT } from '@libp2p/kad-dht'
-import { identify  } from '@libp2p/identify'
+import { identify } from '@libp2p/identify'
 import fs from 'node:fs/promises'
 import { parse } from 'yaml'
 import { generate } from './inference.js'
-import { circuitRelayTransport, circuitRelayServer } from '@libp2p/circuit-relay-v2'
+
+if (typeof Promise.withResolvers !== 'function') {
+  Promise.withResolvers = () => {
+    let resolve, reject
+    const promise = new Promise((res, rej) => { resolve = res; reject = rej })
+    return { promise, resolve, reject }
+  }
+}
 
 const configText = await fs.readFile(new URL('./config.yaml', import.meta.url), 'utf8')
 const config = parse(configText)
 
 const libp2p = await createLibp2p({
-  transports: [webSockets(), circuitRelayTransport(), webRTC()],
+  addresses: {
+    listen: ['/ip4/0.0.0.0/tcp/0/ws']
+  },
+  transports: [webSockets()],
   streamMuxers: [mplex()],
-  connectionEncryption: [noise()],
+  connectionEncrypters: [noise()],
   dht: kadDHT(),
   services: {
-    identify: identify(),
-    relay: circuitRelayServer()
+    identify: identify()
   }
 })
 
@@ -30,8 +38,14 @@ const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 const announceKey = config.announceKey || 'ait:cap:mistral-q4'
 const addr = libp2p.getMultiaddrs()[0]?.toString() || ''
-await libp2p.contentRouting.put(encoder.encode(announceKey), encoder.encode(addr))
-console.log(`announced ${announceKey} at ${addr}`)
+
+console.log(`listening on ${addr}`)
+try {
+  await libp2p.contentRouting.put(encoder.encode(announceKey), encoder.encode(addr))
+  console.log(`announced ${announceKey} at ${addr}`)
+} catch (err) {
+  console.warn('Failed to announce address:', err)
+}
 
 let active = 0
 const limit = config.maxConcurrent || 1

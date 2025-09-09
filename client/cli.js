@@ -2,24 +2,30 @@
 import { createLibp2p } from 'libp2p'
 import { noise } from '@chainsafe/libp2p-noise'
 import { webSockets } from '@libp2p/websockets'
-import { webRTC } from '@libp2p/webrtc'
 import { mplex } from '@libp2p/mplex'
 import { kadDHT } from '@libp2p/kad-dht'
-import { identify  } from '@libp2p/identify'
-import { circuitRelayTransport, circuitRelayServer } from '@libp2p/circuit-relay-v2'
+import { identify } from '@libp2p/identify'
+import { multiaddr } from '@multiformats/multiaddr'
+
+if (typeof Promise.withResolvers !== 'function') {
+  Promise.withResolvers = () => {
+    let resolve, reject
+    const promise = new Promise((res, rej) => { resolve = res; reject = rej })
+    return { promise, resolve, reject }
+  }
+}
 
 
 const prompt = process.argv.slice(2).join(' ')
 const params = {}
 
 const libp2p = await createLibp2p({
-  transports: [webSockets(), circuitRelayTransport(), webRTC()],
+  transports: [webSockets()],
   streamMuxers: [mplex()],
-  connectionEncryption: [noise()],
+  connectionEncrypters: [noise()],
   dht: kadDHT(),
   services: {
-    identify: identify(),
-    relay: circuitRelayServer()
+    identify: identify()
   }
 })
 
@@ -28,10 +34,29 @@ await libp2p.start()
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 const key = encoder.encode('ait:cap:mistral-q4')
-const value = await libp2p.contentRouting.get(key)
-const addr = decoder.decode(value)
 
-const { stream } = await libp2p.dialProtocol(addr, '/ai-torrent/1/generate')
+let addr = process.env.AI_TORRENT_ADDR
+if (!addr) {
+  try {
+    const value = await libp2p.contentRouting.get(key)
+    addr = decoder.decode(value)
+  } catch (err) {
+    console.error('Failed to resolve provider address:', err)
+    process.exit(1)
+  }
+}
+
+let stream
+try {
+  ({ stream } = await libp2p.dialProtocol(multiaddr(addr), '/ai-torrent/1/generate'))
+} catch (err) {
+  console.error('Failed to connect to provider:', err)
+  process.exit(1)
+}
+if (stream == null) {
+  console.error('No stream returned from provider')
+  process.exit(1)
+}
 
 await stream.sink((async function* () {
   yield encoder.encode(JSON.stringify({ prompt, params }) + '\n')

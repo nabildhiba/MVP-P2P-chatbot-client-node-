@@ -41,10 +41,10 @@ const libp2p = await createLibp2p({
 await libp2p.start()
 
 libp2p.addEventListener('peer:connect', e => {
-  console.log('peer connected:', e.detail.remotePeer.toString())
+  console.log('peer connected:', e.detail.toString())
 })
 libp2p.addEventListener('peer:disconnect', e => {
-  console.log('peer disconnected:', e.detail.remotePeer.toString())
+  console.log('peer disconnected:', e.detail.toString())
 })
 
 const encoder = new TextEncoder()

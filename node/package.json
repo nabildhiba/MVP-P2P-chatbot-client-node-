@@ -6,13 +6,14 @@
     "start": "node daemon.js"
   },
   "dependencies": {
-    "libp2p": "*",
     "@chainsafe/libp2p-noise": "*",
+    "@libp2p/circuit-relay-v2": "^3.2.24",
+    "@libp2p/identify": "*",
     "@libp2p/kad-dht": "*",
+    "@libp2p/mplex": "*",
     "@libp2p/webrtc": "*",
     "@libp2p/websockets": "*",
-    "@libp2p/mplex": "*",
-    "@libp2p/identify": "*",
+    "libp2p": "*",
     "yaml": "*"
   }
 }

@@ -4,20 +4,24 @@ import { webSockets } from '@libp2p/websockets'
 import { webRTC } from '@libp2p/webrtc'
 import { mplex } from '@libp2p/mplex'
 import { kadDHT } from '@libp2p/kad-dht'
-import { identifyService } from '@libp2p/identify'
+import { identify  } from '@libp2p/identify'
 import fs from 'node:fs/promises'
 import { parse } from 'yaml'
 import { generate } from './inference.js'
+import { circuitRelayTransport, circuitRelayServer } from '@libp2p/circuit-relay-v2'
 
 const configText = await fs.readFile(new URL('./config.yaml', import.meta.url), 'utf8')
 const config = parse(configText)
 
 const libp2p = await createLibp2p({
-  transports: [webSockets(), webRTC()],
+  transports: [webSockets(), circuitRelayTransport(), webRTC()],
   streamMuxers: [mplex()],
   connectionEncryption: [noise()],
   dht: kadDHT(),
-  services: { identify: identifyService() }
+  services: {
+    identify: identify(),
+    relay: circuitRelayServer()
+  }
 })
 
 await libp2p.start()

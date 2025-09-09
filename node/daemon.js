@@ -34,6 +34,13 @@ const libp2p = await createLibp2p({
 
 await libp2p.start()
 
+libp2p.addEventListener('peer:connect', e => {
+  console.log('peer connected:', e.detail.remotePeer.toString())
+})
+libp2p.addEventListener('peer:disconnect', e => {
+  console.log('peer disconnected:', e.detail.remotePeer.toString())
+})
+
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 const announceKey = config.announceKey || 'ait:cap:mistral-q4'
@@ -50,7 +57,8 @@ try {
 let active = 0
 const limit = config.maxConcurrent || 1
 
-libp2p.handle('/ai-torrent/1/generate', async ({ stream }) => {
+libp2p.handle('/ai-torrent/1/generate', async ({ stream, connection }) => {
+  console.log('incoming generate request from', connection.remotePeer.toString())
   if (active >= limit) {
     await stream.sink((async function* () {
       yield encoder.encode(JSON.stringify({ error: 'Too many requests' }) + '\n')

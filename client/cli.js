@@ -8,6 +8,7 @@ import { identify } from '@libp2p/identify'
 import { bootstrap } from '@libp2p/bootstrap'
 import { multiaddr } from '@multiformats/multiaddr'
 import { readFileSync } from 'node:fs'
+import { ConnectionFailedError } from '@libp2p/interface'
 
 if (typeof Promise.withResolvers !== 'function') {
   Promise.withResolvers = () => {
@@ -67,9 +68,17 @@ if (!addr) {
 
 let stream
 try {
+  console.log(`Connecting to provider at ${addr}`)
   stream = await libp2p.dialProtocol(multiaddr(addr), '/ai-torrent/1/generate')
 } catch (err) {
-  console.error('Failed to connect to provider:', err)
+  if (err instanceof ConnectionFailedError) {
+    const msg = err.cause?.message ?? err.message
+    console.error(`Failed to connect to provider at ${addr}: ${msg}`)
+    console.error('Hint: AI_TORRENT_ADDR may be outdated or the daemon may not be running.')
+  } else {
+    console.error(`Failed to connect to provider at ${addr}:`, err)
+    console.error('Hint: AI_TORRENT_ADDR may be outdated or the daemon may not be running.')
+  }
   process.exit(1)
 }
 if (!stream) {

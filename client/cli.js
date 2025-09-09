@@ -41,6 +41,13 @@ const decoder = new TextDecoder()
 const key = encoder.encode('ait:cap:mistral-q4')
 
 let addr = process.env.AI_TORRENT_ADDR
+if (!addr && process.env.PORT) {
+  try {
+    const fileAddr = readFileSync(new URL('./daemon.addr', import.meta.url), 'utf8').trim()
+    const peerId = fileAddr.split('/p2p/')[1]
+    if (peerId) addr = `/ip4/127.0.0.1/tcp/${process.env.PORT}/ws/p2p/${peerId}`
+  } catch {}
+}
 if (!addr) {
   try {
     addr = readFileSync(new URL('./daemon.addr', import.meta.url), 'utf8').trim()

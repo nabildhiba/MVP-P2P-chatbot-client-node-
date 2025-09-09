@@ -19,7 +19,11 @@ if (typeof Promise.withResolvers !== 'function') {
 }
 
 
-const prompt = process.argv.slice(2).join(' ')
+const args = process.argv.slice(2)
+const discoverIndex = args.indexOf('--discover')
+const discover = discoverIndex !== -1
+if (discover) args.splice(discoverIndex, 1)
+const prompt = args.join(' ')
 const params = {}
 
 const bootstrappers = [process.env.BOOTSTRAP_ADDR].filter(Boolean)
@@ -41,7 +45,8 @@ const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 const key = encoder.encode('ait:cap:mistral-q4')
 
-let addr = process.env.AI_TORRENT_ADDR
+let addr
+if (!discover) addr = process.env.AI_TORRENT_ADDR
 if (!addr && process.env.PORT) {
   try {
     const fileAddr = readFileSync(new URL('./daemon.addr', import.meta.url), 'utf8').trim()

@@ -5,7 +5,8 @@ import { mplex } from '@libp2p/mplex'
 import { kadDHT } from '@libp2p/kad-dht'
 import { identify } from '@libp2p/identify'
 import { bootstrap } from '@libp2p/bootstrap'
-import fs from 'node:fs/promises'
+import fsp from 'node:fs/promises'
+import { writeFileSync } from 'node:fs'
 import { parse } from 'yaml'
 import { generate } from './inference.js'
 
@@ -17,7 +18,7 @@ if (typeof Promise.withResolvers !== 'function') {
   }
 }
 
-const configText = await fs.readFile(new URL('./config.yaml', import.meta.url), 'utf8')
+const configText = await fsp.readFile(new URL('./config.yaml', import.meta.url), 'utf8')
 const config = parse(configText)
 
 const bootstrappers = [process.env.BOOTSTRAP_ADDR].filter(Boolean)
@@ -51,6 +52,11 @@ const announceKey = config.announceKey || 'ait:cap:mistral-q4'
 const addr = libp2p.getMultiaddrs()[0]?.toString() || ''
 
 console.log(`listening on ${addr}`)
+try {
+  writeFileSync(new URL('../client/daemon.addr', import.meta.url), addr)
+} catch (err) {
+  console.warn('Failed to write address file:', err)
+}
 try {
   await libp2p.contentRouting.put(encoder.encode(announceKey), encoder.encode(addr))
   console.log(`announced ${announceKey} at ${addr}`)

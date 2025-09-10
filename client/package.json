@@ -12,6 +12,7 @@
     "@libp2p/mplex": "*",
     "@libp2p/websockets": "*",
     "@libp2p/bootstrap": "*",
+    "@libp2p/ping": "*",
     "libp2p": "*"
   }
 }

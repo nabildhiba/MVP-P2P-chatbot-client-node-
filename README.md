@@ -11,14 +11,32 @@ Ce projet contient deux packages Node.js utilisant [libp2p](https://libp2p.io/) 
 
 - Node.js ≥ 20
 
+## Fichier de configuration
+
+Dupliquez `config.example.json` en `config.json` et renseignez les valeurs :
+
+```json
+{
+  "rpcUrl": "https://rpc-mumbai.maticvigil.com",
+  "privateKey": "0x...",
+  "tokenAddress": "0x...",
+  "bootstrapAddr": "" // optionnel
+}
+```
+
+Ce fichier est lu automatiquement par Hardhat et le client pour éviter l'utilisation de variables d'environnement.
+
 ## Variables d'environnement
 
 - `PORT` : port d'écoute du démon. Par défaut, le démon utilise le port configuré dans `node/config.yaml` (55781). Pour choisir un port stable, définissez cette variable avant de lancer le démon, par exemple : `PORT=60000 npm run start --prefix node`. Le client utilise également cette valeur pour se connecter au démon local lorsque `AI_TORRENT_ADDR` n'est pas fournie.
 - `AI_TORRENT_ADDR` : adresse explicite du fournisseur. Ignorée si l'option `--discover` est utilisée.
+
+=======
 - `POLYGON_RPC_URL` : URL du nœud RPC Polygon Mumbai utilisée par Hardhat.
 - `PRIVATE_KEY` : clé privée pour signer les transactions (déploiement et récompenses).
 - `WEB3_RPC_URL` : URL RPC utilisée par le client pour envoyer les récompenses.
 - `TOKEN_ADDRESS` : adresse du contrat ERC‑20 déployé utilisée par le client.
+
 
 ## Démarrage rapide
 

@@ -28,7 +28,8 @@ try {
   fileConfig = JSON.parse(readFileSync(new URL('../config.json', import.meta.url)))
 } catch {}
 const web3 = new Web3(fileConfig.rpcUrl || process.env.WEB3_RPC_URL || '')
-const wallet = web3.eth.accounts.wallet.add(fileConfig.privateKey || process.env.PRIVATE_KEY || '')
+const pk = fileConfig.privateKey || process.env.PRIVATE_KEY || ''
+const wallet = web3.eth.accounts.wallet.add(pk.startsWith('0x') ? pk : `0x${pk}`)
 const tokenAbi = [
   { inputs: [], name: 'decimals', outputs: [{ name: '', type: 'uint8' }], stateMutability: 'view', type: 'function' },
   { inputs: [{ name: 'to', type: 'address' }, { name: 'value', type: 'uint256' }], name: 'transfer', outputs: [{ name: '', type: 'bool' }], stateMutability: 'nonpayable', type: 'function' }

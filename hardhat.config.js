@@ -5,14 +5,15 @@ try {
   cfg = JSON.parse(fs.readFileSync("./config.json", "utf8"));
 } catch {}
 const POLYGON_RPC_URL = cfg.rpcUrl || process.env.POLYGON_RPC_URL || "";
-const PRIVATE_KEY = cfg.privateKey || process.env.PRIVATE_KEY || "";
+const PK = cfg.privateKey || process.env.PRIVATE_KEY || "";
+const ACCOUNTS = PK ? [PK.startsWith("0x") ? PK : `0x${PK}`] : [];
 
 module.exports = {
   solidity: "0.8.20",
   networks: {
-    mumbai: {
+    polygonMumbai: {
       url: POLYGON_RPC_URL || "",
-      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
+      accounts: ACCOUNTS,
     },
   },
 };

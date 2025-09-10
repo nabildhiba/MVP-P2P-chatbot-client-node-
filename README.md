@@ -18,7 +18,7 @@ Dupliquez `config.example.json` en `config.json` et renseignez les valeurs :
 ```json
 {
   "rpcUrl": "https://rpc-mumbai.maticvigil.com",
-  "privateKey": "0x...",
+  "privateKey": "...",
   "tokenAddress": "0x...",
   "bootstrapAddr": "" // optionnel
 }

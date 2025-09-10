@@ -26,6 +26,7 @@ const discoverIndex = args.indexOf('--discover')
 const discover = discoverIndex !== -1
 if (discover) args.splice(discoverIndex, 1)
 const params = {}
+let context
 
 const bootstrappers = [process.env.BOOTSTRAP_ADDR].filter(Boolean)
 
@@ -95,6 +96,8 @@ async function sendPrompt (prompt) {
     return
   }
 
+  params.context = context
+
   await stream.sink((async function * () {
     yield encoder.encode(JSON.stringify({ prompt, params }) + '\n')
   })())
@@ -115,6 +118,7 @@ async function sendPrompt (prompt) {
         break outer
       }
       if (msg.done) {
+        context = msg.context
         process.stdout.write('\n')
         break outer
       }
@@ -125,7 +129,15 @@ async function sendPrompt (prompt) {
 while (true) {
   const prompt = await rl.question('> ')
   const trimmed = prompt.trim().toLowerCase()
-  if (trimmed === 'exit' || trimmed === 'quit') break
+  if (trimmed === 'exit' || trimmed === 'quit') {
+    context = undefined
+    break
+  }
+  if (trimmed === 'new') {
+    context = undefined
+    console.log('Starting new session')
+    continue
+  }
   await sendPrompt(prompt)
 }
 

@@ -51,15 +51,19 @@ const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 const announceKey = config.announceKey || 'ait:cap:mistral-q4'
 const addr = libp2p.getMultiaddrs()[0]?.toString() || ''
+const rewardAddress = config.rewardAddress || ''
+const announcement = JSON.stringify({ addr, rewardAddress })
 
 console.log(`listening on ${addr}`)
 try {
-  writeFileSync(new URL('../client/daemon.addr', import.meta.url), addr)
+  const fileData = [addr]
+  if (rewardAddress) fileData.push(rewardAddress)
+  writeFileSync(new URL('../client/daemon.addr', import.meta.url), fileData.join('\n'))
 } catch (err) {
   console.warn('Failed to write address file:', err)
 }
 try {
-  await libp2p.contentRouting.put(encoder.encode(announceKey), encoder.encode(addr))
+  await libp2p.contentRouting.put(encoder.encode(announceKey), encoder.encode(announcement))
   console.log(`announced ${announceKey} at ${addr}`)
 } catch (err) {
   console.warn('Failed to announce address:', err)

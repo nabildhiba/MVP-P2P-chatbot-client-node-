@@ -9,6 +9,7 @@ import { bootstrap } from '@libp2p/bootstrap'
 import { ping } from '@libp2p/ping'
 import { createInterface } from 'readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
+import Web3 from 'web3'
 
 if (typeof Promise.withResolvers !== 'function') {
   Promise.withResolvers = () => {
@@ -21,6 +22,15 @@ if (typeof Promise.withResolvers !== 'function') {
 
 const params = {}
 let context
+const web3 = new Web3(process.env.WEB3_RPC_URL)
+const wallet = web3.eth.accounts.wallet.add(process.env.PRIVATE_KEY)
+const tokenAbi = [
+  { inputs: [], name: 'decimals', outputs: [{ name: '', type: 'uint8' }], stateMutability: 'view', type: 'function' },
+  { inputs: [{ name: 'to', type: 'address' }, { name: 'value', type: 'uint256' }], name: 'transfer', outputs: [{ name: '', type: 'bool' }], stateMutability: 'nonpayable', type: 'function' }
+]
+const tokenContract = new web3.eth.Contract(tokenAbi, process.env.TOKEN_ADDRESS)
+const decimals = Number(await tokenContract.methods.decimals().call())
+const requestCounts = new Map()
 
 const bootstrappers = [process.env.BOOTSTRAP_ADDR].filter(Boolean)
 
@@ -54,8 +64,14 @@ async function discoverProviders () {
     } catch {
       latency = Infinity
     }
+    let rewardAddress
+    try {
+      const record = await libp2p.contentRouting.get(key)
+      const info = JSON.parse(decoder.decode(record))
+      if (info.addr === prov.multiaddrs[0].toString()) rewardAddress = info.rewardAddress
+    } catch {}
     console.log(`Tentative de connexion au pair ${prov.id.toString()} - Latence ${latency}ms`)
-    peers.push({ id: prov.id, addr: prov.multiaddrs[0], latency })
+    peers.push({ id: prov.id, addr: prov.multiaddrs[0], latency, rewardAddress })
   }
   peers.sort((a, b) => a.latency - b.latency)
   return peers
@@ -150,6 +166,18 @@ async function sendPrompt (prompt) {
     if (a.peer !== selected.peer) a.controller.abort()
   }
   await selected.finished
+  const peerId = selected.peer.id.toString()
+  const count = (requestCounts.get(peerId) || 0) + 1
+  requestCounts.set(peerId, count)
+  if (selected.peer.rewardAddress && count % 10 === 0) {
+    try {
+      const amount = 10n ** BigInt(decimals)
+      const tx = await tokenContract.methods.transfer(selected.peer.rewardAddress, amount).send({ from: wallet.address })
+      console.log(`Reward tx: ${tx.transactionHash}`)
+    } catch (err) {
+      console.error('Reward transfer failed:', err)
+    }
+  }
   winner = undefined
 }
 

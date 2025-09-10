@@ -10,7 +10,7 @@ const PRIVATE_KEY = cfg.privateKey || process.env.PRIVATE_KEY || "";
 module.exports = {
   solidity: "0.8.20",
   networks: {
-    mumbai: {
+    polygonMumbai: {
       url: POLYGON_RPC_URL || "",
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
     },

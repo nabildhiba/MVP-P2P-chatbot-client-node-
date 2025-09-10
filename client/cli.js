@@ -6,9 +6,7 @@ import { mplex } from '@libp2p/mplex'
 import { kadDHT } from '@libp2p/kad-dht'
 import { identify } from '@libp2p/identify'
 import { bootstrap } from '@libp2p/bootstrap'
-import { multiaddr } from '@multiformats/multiaddr'
-import { readFileSync } from 'node:fs'
-import { ConnectionFailedError } from '@libp2p/interface'
+import { ping } from '@libp2p/ping'
 import { createInterface } from 'readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
 
@@ -21,10 +19,6 @@ if (typeof Promise.withResolvers !== 'function') {
 }
 
 
-const args = process.argv.slice(2)
-const discoverIndex = args.indexOf('--discover')
-const discover = discoverIndex !== -1
-if (discover) args.splice(discoverIndex, 1)
 const params = {}
 let context
 
@@ -37,7 +31,8 @@ const libp2p = await createLibp2p({
   dht: kadDHT(),
   peerDiscovery: bootstrappers.length ? [bootstrap({ list: bootstrappers })] : [],
   services: {
-    identify: identify()
+    identify: identify(),
+    ping: ping()
   }
 })
 
@@ -49,81 +44,113 @@ const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 const key = encoder.encode('ait:cap:mistral-q4')
 
-let addr
-if (!discover) addr = process.env.AI_TORRENT_ADDR
-if (!addr && process.env.PORT) {
-  try {
-    const fileAddr = readFileSync(new URL('./daemon.addr', import.meta.url), 'utf8').trim()
-    const peerId = fileAddr.split('/p2p/')[1]
-    if (peerId) addr = `/ip4/127.0.0.1/tcp/${process.env.PORT}/ws/p2p/${peerId}`
-  } catch {}
-}
-if (!addr) {
-  try {
-    addr = readFileSync(new URL('./daemon.addr', import.meta.url), 'utf8').trim()
-  } catch (err) {
-    console.warn('Failed to read daemon address file:', err)
+async function discoverProviders () {
+  const peers = []
+  for await (const prov of libp2p.contentRouting.findProviders(key, { maxTimeout: 5000 })) {
+    if (prov.multiaddrs.length === 0) continue
+    let latency
+    try {
+      latency = await libp2p.ping(prov.id)
+    } catch {
+      latency = Infinity
+    }
+    console.log(`Tentative de connexion au pair ${prov.id.toString()} - Latence ${latency}ms`)
+    peers.push({ id: prov.id, addr: prov.multiaddrs[0], latency })
   }
+  peers.sort((a, b) => a.latency - b.latency)
+  return peers
 }
-if (!addr) {
-  try {
-    const value = await libp2p.contentRouting.get(key)
-    addr = decoder.decode(value)
-  } catch (err) {
-    console.error('Failed to resolve provider address:', err)
-    process.exit(1)
-  }
+
+let winner
+
+function attemptPeer (peer, prompt) {
+  const controller = new AbortController()
+  const { promise: started, resolve: startedResolve, reject: startedReject } = Promise.withResolvers()
+  const { promise: finished, resolve: finishedResolve, reject: finishedReject } = Promise.withResolvers()
+  const timeout = setTimeout(() => {
+    controller.abort()
+    startedReject(new Error('timeout'))
+    finishedReject(new Error('timeout'))
+  }, 2000)
+
+  ;(async () => {
+    let first = true
+    try {
+      const stream = await libp2p.dialProtocol(peer.addr, '/ai-torrent/1/generate', { signal: controller.signal })
+      params.context = context
+      await stream.sink((async function * () {
+        yield encoder.encode(JSON.stringify({ prompt, params }) + '\n')
+      })())
+      let buffer = ''
+      outer: for await (const chunk of stream.source) {
+        const data = chunk.subarray ? chunk.subarray() : Uint8Array.from(chunk)
+        buffer += decoder.decode(data)
+        let index
+        while ((index = buffer.indexOf('\n')) !== -1) {
+          const line = buffer.slice(0, index)
+          buffer = buffer.slice(index + 1)
+          if (!line.trim()) continue
+          const msg = JSON.parse(line)
+          if (first) {
+            first = false
+            startedResolve({ peer, finished })
+            if (winner && winner !== peer) {
+              controller.abort()
+              finishedResolve()
+              return
+            }
+            if (!winner) winner = peer
+          }
+          if (winner !== peer) {
+            controller.abort()
+            finishedResolve()
+            return
+          }
+          process.stdout.write(msg.response || '')
+          if (msg.error) {
+            console.error(msg.error)
+            finishedResolve()
+            return
+          }
+          if (msg.done) {
+            context = msg.context
+            process.stdout.write('\n')
+            finishedResolve()
+            return
+          }
+        }
+      }
+      finishedResolve()
+    } catch (err) {
+      if (first) startedReject(err)
+      finishedReject(err)
+    } finally {
+      clearTimeout(timeout)
+    }
+  })()
+
+  return { peer, controller, started, finished }
 }
 
 async function sendPrompt (prompt) {
-  let stream
+  const providers = await discoverProviders()
+  if (!providers.length) {
+    console.error('Aucun pair n\'a répondu. Réessayez plus tard.')
+    return
+  }
+  const attempts = providers.slice(0, 3).map(p => attemptPeer(p, prompt))
+  let selected
   try {
-    console.log(`Connecting to provider at ${addr}`)
-    stream = await libp2p.dialProtocol(multiaddr(addr), '/ai-torrent/1/generate')
+    selected = await Promise.any(attempts.map(a => a.started))
   } catch (err) {
-    if (err instanceof ConnectionFailedError) {
-      const msg = err.cause?.message ?? err.message
-      console.error(`Failed to connect to provider at ${addr}: ${msg}`)
-      console.error('Hint: AI_TORRENT_ADDR may be outdated or the daemon may not be running.')
-    } else {
-      console.error(`Failed to connect to provider at ${addr}:`, err)
-      console.error('Hint: AI_TORRENT_ADDR may be outdated or the daemon may not be running.')
-    }
+    console.error('Aucun pair n\'a répondu. Réessayez plus tard.')
     return
   }
-  if (!stream) {
-    console.error('No stream returned from provider')
-    return
+  for (const a of attempts) {
+    if (a.peer !== selected.peer) a.controller.abort()
   }
-
-  params.context = context
-
-  await stream.sink((async function * () {
-    yield encoder.encode(JSON.stringify({ prompt, params }) + '\n')
-  })())
-
-  let buffer = ''
-  outer: for await (const chunk of stream.source) {
-    const data = chunk.subarray ? chunk.subarray() : Uint8Array.from(chunk)
-    buffer += decoder.decode(data)
-    let index
-    while ((index = buffer.indexOf('\n')) !== -1) {
-      const line = buffer.slice(0, index)
-      buffer = buffer.slice(index + 1)
-      if (!line.trim()) continue
-      const msg = JSON.parse(line)
-      process.stdout.write(msg.response || '')
-      if (msg.error) {
-        console.error(msg.error)
-        break outer
-      }
-      if (msg.done) {
-        context = msg.context
-        process.stdout.write('\n')
-        break outer
-      }
-    }
-  }
+  await selected.finished
+  winner = undefined
 }
 
 while (true) {

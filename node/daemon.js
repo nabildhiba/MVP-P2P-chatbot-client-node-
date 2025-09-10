@@ -80,7 +80,8 @@ libp2p.handle('/ai-torrent/1/generate', async ({ stream, connection }) => {
   try {
     let data = ''
     for await (const chunk of stream.source) {
-      data += decoder.decode(chunk)
+      const dataChunk = chunk.subarray ? chunk.subarray() : Uint8Array.from(chunk)
+      data += decoder.decode(dataChunk)
       if (data.includes('\n')) break
     }
     const req = JSON.parse(data.trim())

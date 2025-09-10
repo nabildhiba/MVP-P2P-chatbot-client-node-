@@ -9,6 +9,7 @@ import fsp from 'node:fs/promises'
 import { writeFileSync } from 'node:fs'
 import { parse } from 'yaml'
 import { generate } from './inference.js'
+import Web3 from 'web3'
 
 if (typeof Promise.withResolvers !== 'function') {
   Promise.withResolvers = () => {
@@ -20,6 +21,11 @@ if (typeof Promise.withResolvers !== 'function') {
 
 const configText = await fsp.readFile(new URL('./config.yaml', import.meta.url), 'utf8')
 const config = parse(configText)
+
+const web3 = (config.rpcUrl || process.env.RPC_URL)
+  ? new Web3(config.rpcUrl || process.env.RPC_URL)
+  : null
+const rewardsFile = new URL('./rewards.json', import.meta.url)
 
 const bootstrappers = [process.env.BOOTSTRAP_ADDR].filter(Boolean)
 const port = process.env.PORT || config.port || 55781
@@ -72,6 +78,33 @@ try {
 let active = 0
 const limit = config.maxConcurrent || 1
 
+async function watchRewards () {
+  if (!web3 || !rewardAddress) return
+  try {
+    const blockNumber = await web3.eth.getBlockNumber()
+    const transferTopic = web3.utils.sha3('Transfer(address,address,uint256)')
+    const toTopic = '0x' + rewardAddress.toLowerCase().slice(2).padStart(64, '0')
+    const logs = await web3.eth.getPastLogs({ fromBlock: blockNumber, toBlock: blockNumber, topics: [transferTopic, null, toTopic] })
+    for (const log of logs) {
+      const decoded = web3.eth.abi.decodeLog([
+        { type: 'address', name: 'from', indexed: true },
+        { type: 'address', name: 'to', indexed: true },
+        { type: 'uint256', name: 'value' }
+      ], log.data, [log.topics[1], log.topics[2]])
+      const amountWei = BigInt(decoded.value)
+      let totalWei = 0n
+      try {
+        totalWei = BigInt((await fsp.readFile(rewardsFile, 'utf8')).trim() || '0')
+      } catch {}
+      totalWei += amountWei
+      await fsp.writeFile(rewardsFile, totalWei.toString())
+      console.log(`Reward confirmed: ${web3.utils.fromWei(decoded.value, 'ether')} tokens (total ${web3.utils.fromWei(totalWei.toString(), 'ether')})`)
+    }
+  } catch (err) {
+    console.warn('Failed to check rewards:', err)
+  }
+}
+
 libp2p.handle('/ai-torrent/1/generate', async ({ stream, connection }) => {
   console.log('incoming generate request from', connection.remotePeer.toString())
   if (active >= limit) {
@@ -96,6 +129,7 @@ libp2p.handle('/ai-torrent/1/generate', async ({ stream, connection }) => {
         yield encoder.encode(line + '\n')
       }
     })())
+    await watchRewards()
   } catch (err) {
     await stream.sink((async function* () {
       yield encoder.encode(JSON.stringify({ error: err.message }) + '\n')

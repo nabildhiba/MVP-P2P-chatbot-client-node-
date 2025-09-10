@@ -9,6 +9,7 @@ import { bootstrap } from '@libp2p/bootstrap'
 import { ping } from '@libp2p/ping'
 import { createInterface } from 'readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
+import { readFileSync } from 'node:fs'
 import Web3 from 'web3'
 
 if (typeof Promise.withResolvers !== 'function') {
@@ -22,17 +23,21 @@ if (typeof Promise.withResolvers !== 'function') {
 
 const params = {}
 let context
-const web3 = new Web3(process.env.WEB3_RPC_URL)
-const wallet = web3.eth.accounts.wallet.add(process.env.PRIVATE_KEY)
+let fileConfig = {}
+try {
+  fileConfig = JSON.parse(readFileSync(new URL('../config.json', import.meta.url)))
+} catch {}
+const web3 = new Web3(fileConfig.rpcUrl || process.env.WEB3_RPC_URL || '')
+const wallet = web3.eth.accounts.wallet.add(fileConfig.privateKey || process.env.PRIVATE_KEY || '')
 const tokenAbi = [
   { inputs: [], name: 'decimals', outputs: [{ name: '', type: 'uint8' }], stateMutability: 'view', type: 'function' },
   { inputs: [{ name: 'to', type: 'address' }, { name: 'value', type: 'uint256' }], name: 'transfer', outputs: [{ name: '', type: 'bool' }], stateMutability: 'nonpayable', type: 'function' }
 ]
-const tokenContract = new web3.eth.Contract(tokenAbi, process.env.TOKEN_ADDRESS)
+const tokenContract = new web3.eth.Contract(tokenAbi, fileConfig.tokenAddress || process.env.TOKEN_ADDRESS)
 const decimals = Number(await tokenContract.methods.decimals().call())
 const requestCounts = new Map()
 
-const bootstrappers = [process.env.BOOTSTRAP_ADDR].filter(Boolean)
+const bootstrappers = [fileConfig.bootstrapAddr || process.env.BOOTSTRAP_ADDR].filter(Boolean)
 
 const libp2p = await createLibp2p({
   transports: [webSockets()],

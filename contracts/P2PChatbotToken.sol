@@ -5,7 +5,9 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract P2PChatbotToken is ERC20, Ownable {
-    constructor(uint256 initialSupply) ERC20("P2PChatbotToken", "P2PCT") {
-        _mint(msg.sender, initialSupply);
+    constructor() ERC20("P2P Chatbot Token", "PCT") {}
+
+    function mint(address to, uint256 amount) external onlyOwner {
+        _mint(to, amount);
     }
 }

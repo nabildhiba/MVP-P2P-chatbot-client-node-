@@ -96,14 +96,24 @@ await stream.sink((async function* () {
 })())
 
 let buffer = ''
-for await (const chunk of stream.source) {
+outer: for await (const chunk of stream.source) {
   const data = chunk.subarray ? chunk.subarray() : Uint8Array.from(chunk)
   buffer += decoder.decode(data)
   let index
   while ((index = buffer.indexOf('\n')) !== -1) {
     const line = buffer.slice(0, index)
     buffer = buffer.slice(index + 1)
-    if (line.trim()) process.stdout.write(line + '\n')
+    if (!line.trim()) continue
+    const msg = JSON.parse(line)
+    process.stdout.write(msg.response || '')
+    if (msg.error) {
+      console.error(msg.error)
+      break outer
+    }
+    if (msg.done) {
+      process.stdout.write('\n')
+      break outer
+    }
   }
 }
 

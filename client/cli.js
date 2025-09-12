@@ -60,15 +60,12 @@ async function discoverProviders () {
     peers.push({ id: addr, addr, latency: 0 })
   }
 
-  // Discover nodes via DHT if routers are configured
-  let hasContentRouters = false
-  try {
-    const routers = libp2p.components.contentRouters
-    hasContentRouters = Array.isArray(routers) ? routers.length > 0 : routers?.size > 0
-  } catch {}
+  // Discover nodes via DHT if content routers are available
+  const routers = libp2p.components?.contentRouters
+  const hasContentRouters = Array.isArray(routers) ? routers.length > 0 : routers?.size > 0
 
   if (!hasContentRouters) {
-    console.warn('No DHT routers configured, falling back to static nodes')
+    console.warn('No content routers available; using static nodes only.')
   } else {
     try {
       for await (const prov of libp2p.contentRouting.findProviders(key, { maxTimeout: 5000 })) {
@@ -84,7 +81,7 @@ async function discoverProviders () {
       }
     } catch (err) {
       if (err.name === 'NoContentRoutersError') {
-        console.warn('No DHT routers configured, falling back to static nodes')
+        console.warn('No content routers available; using static nodes only.')
       } else {
         console.error('Error discovering nodes via DHT:', err)
       }

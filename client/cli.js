@@ -27,6 +27,7 @@ try {
   fileConfig = JSON.parse(readFileSync(new URL('../config.json', import.meta.url)))
 } catch {}
 
+// bootstrap for DHT discovery
 const bootstrappers = [fileConfig.bootstrapAddr || process.env.BOOTSTRAP_ADDR].filter(Boolean)
 
 const libp2p = await createLibp2p({
@@ -49,8 +50,17 @@ const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 const key = encoder.encode('ait:cap:mistral-q4')
 
+// Discover peers either from a static list in config or through the DHT
 async function discoverProviders () {
   const peers = []
+
+  // Add statically configured nodes
+  const staticNodes = Array.isArray(fileConfig.nodes) ? fileConfig.nodes : []
+  for (const addr of staticNodes) {
+    peers.push({ id: addr, addr, latency: 0 })
+  }
+
+  // Discover nodes via DHT
   for await (const prov of libp2p.contentRouting.findProviders(key, { maxTimeout: 5000 })) {
     if (prov.multiaddrs.length === 0) continue
     let latency
@@ -60,17 +70,29 @@ async function discoverProviders () {
       latency = Infinity
     }
     console.log(`Tentative de connexion au pair ${prov.id.toString()} - Latence ${latency}ms`)
-    peers.push({ id: prov.id, addr: prov.multiaddrs[0], latency })
+    peers.push({ id: prov.id.toString(), addr: prov.multiaddrs[0], latency })
   }
-  peers.sort((a, b) => a.latency - b.latency)
-  return peers
+
+  // Deduplicate peers by address
+  const seen = new Set()
+  const unique = []
+  for (const p of peers) {
+    const key = p.addr.toString()
+    if (seen.has(key)) continue
+    seen.add(key)
+    unique.push(p)
+  }
+  unique.sort((a, b) => a.latency - b.latency)
+  return unique
 }
 
-let providerIndex = 0
-
+// Send a prompt to a given peer and collect the response
 async function sendToPeer (peer, prompt) {
+  const start = Date.now()
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 2000)
+  const result = { peer, ok: false, response: '', duration: 0 }
+  console.log(`Envoi de la requête au pair ${peer.id}`)
   try {
     const stream = await libp2p.dialProtocol(peer.addr, '/ai-torrent/1/generate', { signal: controller.signal })
     params.context = context
@@ -87,42 +109,54 @@ async function sendToPeer (peer, prompt) {
         buffer = buffer.slice(index + 1)
         if (!line.trim()) continue
         const msg = JSON.parse(line)
-        process.stdout.write(msg.response || '')
+        if (msg.response) result.response += msg.response
         if (msg.error) {
-          console.error(msg.error)
-          return false
+          console.error(`Erreur du noeud ${peer.id}:`, msg.error)
+          return result
         }
         if (msg.done) {
-          context = msg.context
-          process.stdout.write('\n')
-          return true
+          result.ok = true
+          result.context = msg.context
         }
       }
     }
   } catch (err) {
-    console.error('Erreur durant la requête :', err.message)
+    console.error(`Erreur durant la requête auprès du pair ${peer.id}:`, err.message)
   } finally {
     clearTimeout(timeout)
+    result.duration = Date.now() - start
   }
-  return false
+  return result
 }
 
+// Send the prompt to all discovered peers in parallel and combine responses
 async function sendPrompt (prompt) {
   const providers = await discoverProviders()
   if (!providers.length) {
     console.error('Aucun pair n\'a répondu. Réessayez plus tard.')
     return
   }
-  for (let i = 0; i < providers.length; i++) {
-    const peer = providers[(providerIndex + i) % providers.length]
-    console.log(`Tentative de requête au pair ${peer.id.toString()}`)
-    const ok = await sendToPeer(peer, prompt)
-    if (ok) {
-      providerIndex = (providerIndex + i + 1) % providers.length
-      return
+
+  const results = await Promise.all(providers.map(p => sendToPeer(p, prompt)))
+  const successes = results.filter(r => r.ok)
+
+  for (const r of results) {
+    if (r.ok) {
+      console.log(`Réponse reçue de ${r.peer.id} en ${r.duration}ms`)
+    } else {
+      console.log(`Aucune réponse de ${r.peer.id}`)
     }
   }
-  console.error('Aucun pair n\'a répondu. Réessayez plus tard.')
+
+  if (!successes.length) {
+    console.error('Aucun pair n\'a répondu. Réessayez plus tard.')
+    return
+  }
+
+  // combine responses from all successful peers
+  const combined = successes.map(r => r.response).join('\n')
+  context = successes[0].context
+  process.stdout.write(combined + '\n')
 }
 
 while (true) {

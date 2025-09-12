@@ -1,6 +1,6 @@
 # ai-torrent
 
-Ce projet contient deux packages Node.js utilisant [libp2p](https://libp2p.io/) pour effectuer des requêtes d'inférence distribuées dans un réseau pair-à-pair classique. Les nœuds hébergent des fragments de modèle qui peuvent être dupliqués pour la résilience et le client répartit les requêtes entre plusieurs nœuds découverts.
+Ce projet contient deux packages Node.js utilisant [libp2p](https://libp2p.io/) pour effectuer des requêtes d'inférence distribuées dans un réseau pair-à-pair classique. Les nœuds hébergent des fragments de modèle qui peuvent être dupliqués pour la résilience et le client répartit les requêtes entre plusieurs nœuds découverts en parallèle.
 
 ## Packages
 
@@ -17,7 +17,8 @@ Dupliquez `config.example.json` en `config.json` et renseignez les valeurs :
 
 ```json
 {
-  "bootstrapAddr": "" // optionnel
+  "bootstrapAddr": "", // optionnel
+  "nodes": []            // liste de nœuds connus optionnelle
 }
 ```
 

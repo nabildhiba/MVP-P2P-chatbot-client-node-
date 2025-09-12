@@ -49,31 +49,37 @@ libp2p.addEventListener('peer:disconnect', e => {
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
-const announceKey = config.announceKey || 'ait:cap:mistral-q4'
+const announceKeys = config.announceKeys || [config.announceKey || 'ait:cap:mistral-q4']
 const addr = libp2p.getMultiaddrs()[0]?.toString() || ''
-const announcement = JSON.stringify({ addr })
+const announcement = JSON.stringify({ addr, keys: announceKeys })
 
 console.log(`listening on ${addr}`)
+console.log('serving fragments:', announceKeys.join(', '))
 try {
   writeFileSync(new URL('../client/daemon.addr', import.meta.url), addr)
 } catch (err) {
   console.warn('Failed to write address file:', err)
 }
-try {
-  await libp2p.contentRouting.put(encoder.encode(announceKey), encoder.encode(announcement))
-  console.log(`announced ${announceKey} at ${addr}`)
-} catch (err) {
-  console.warn('Failed to announce address:', err)
+for (const key of announceKeys) {
+  try {
+    await libp2p.contentRouting.put(encoder.encode(key), encoder.encode(announcement))
+    console.log(`announced ${key} at ${addr}`)
+  } catch (err) {
+    console.warn('Failed to announce address for', key, err)
+  }
 }
 
 let active = 0
-const limit = config.maxConcurrent || 1
+const limit = config.maxConcurrent ?? Infinity
 libp2p.handle('/ai-torrent/1/generate', async ({ stream, connection }) => {
-  console.log('incoming generate request from', connection.remotePeer.toString())
+  const peerId = connection.remotePeer.toString()
+  const start = Date.now()
+  console.log('incoming generate request from', peerId)
   if (active >= limit) {
     await stream.sink((async function* () {
       yield encoder.encode(JSON.stringify({ error: 'Too many requests' }) + '\n')
     })())
+    console.warn('too many requests, rejected connection from', peerId)
     return
   }
   active++
@@ -92,7 +98,9 @@ libp2p.handle('/ai-torrent/1/generate', async ({ stream, connection }) => {
         yield encoder.encode(line + '\n')
       }
     })())
+    console.log(`request from ${peerId} served in ${Date.now() - start}ms`)
   } catch (err) {
+    console.error('error while handling request from', peerId, err)
     await stream.sink((async function* () {
       yield encoder.encode(JSON.stringify({ error: err.message }) + '\n')
     })())

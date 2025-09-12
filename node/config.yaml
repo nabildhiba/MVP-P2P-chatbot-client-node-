@@ -1,4 +1,5 @@
 model: mistral
-maxConcurrent: 1
-announceKey: ait:cap:mistral-q4
+maxConcurrent: 5
+announceKeys:
+  - ait:cap:mistral-q4
 port: 55781

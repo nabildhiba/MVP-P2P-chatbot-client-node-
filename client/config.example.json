@@ -1,0 +1,6 @@
+{
+  "bootstrapAddr": "/ip4/127.0.0.1/tcp/57000/p2p/QmBootstrapPeer",
+  "nodes": [
+    "/ip4/192.0.2.1/tcp/57000/p2p/QmAnotherPeer"
+  ]
+}

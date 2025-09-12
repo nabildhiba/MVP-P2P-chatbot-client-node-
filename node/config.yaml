@@ -2,4 +2,3 @@ model: mistral
 maxConcurrent: 1
 announceKey: ait:cap:mistral-q4
 port: 55781
-rewardAddress: "<0x...>"

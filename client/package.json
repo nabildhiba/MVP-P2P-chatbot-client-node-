@@ -13,7 +13,6 @@
     "@libp2p/websockets": "*",
     "@libp2p/bootstrap": "*",
     "@libp2p/ping": "*",
-    "libp2p": "*",
-    "web3": "*"
+    "libp2p": "*"
   }
 }

@@ -50,9 +50,17 @@ const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 const key = encoder.encode('ait:cap:mistral-q4')
 
-// Discover peers either from a static list in config or through the DHT
+// Discover peers from a local daemon, a static list in config or through the DHT
 async function discoverProviders () {
   const peers = []
+
+  // Use a locally running daemon if present
+  try {
+    const addr = readFileSync(new URL('../daemon.addr', import.meta.url)).toString().trim()
+    if (addr) {
+      peers.push({ id: addr, addr, latency: 0 })
+    }
+  } catch {}
 
   // Add statically configured nodes
   const staticNodes = Array.isArray(fileConfig.nodes) ? fileConfig.nodes : []

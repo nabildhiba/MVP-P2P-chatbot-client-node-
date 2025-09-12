@@ -9,7 +9,7 @@ import { bootstrap } from '@libp2p/bootstrap'
 import { ping } from '@libp2p/ping'
 import { createInterface } from 'readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
-import Web3 from 'web3'
+import { readFileSync } from 'node:fs'
 
 if (typeof Promise.withResolvers !== 'function') {
   Promise.withResolvers = () => {
@@ -22,17 +22,13 @@ if (typeof Promise.withResolvers !== 'function') {
 
 const params = {}
 let context
-const web3 = new Web3(process.env.WEB3_RPC_URL)
-const wallet = web3.eth.accounts.wallet.add(process.env.PRIVATE_KEY)
-const tokenAbi = [
-  { inputs: [], name: 'decimals', outputs: [{ name: '', type: 'uint8' }], stateMutability: 'view', type: 'function' },
-  { inputs: [{ name: 'to', type: 'address' }, { name: 'value', type: 'uint256' }], name: 'transfer', outputs: [{ name: '', type: 'bool' }], stateMutability: 'nonpayable', type: 'function' }
-]
-const tokenContract = new web3.eth.Contract(tokenAbi, process.env.TOKEN_ADDRESS)
-const decimals = Number(await tokenContract.methods.decimals().call())
-const requestCounts = new Map()
+let fileConfig = {}
+try {
+  fileConfig = JSON.parse(readFileSync(new URL('../config.json', import.meta.url)))
+} catch {}
 
-const bootstrappers = [process.env.BOOTSTRAP_ADDR].filter(Boolean)
+// bootstrap for DHT discovery
+const bootstrappers = [fileConfig.bootstrapAddr || process.env.BOOTSTRAP_ADDR].filter(Boolean)
 
 const libp2p = await createLibp2p({
   transports: [webSockets()],
@@ -54,8 +50,17 @@ const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 const key = encoder.encode('ait:cap:mistral-q4')
 
+// Discover peers either from a static list in config or through the DHT
 async function discoverProviders () {
   const peers = []
+
+  // Add statically configured nodes
+  const staticNodes = Array.isArray(fileConfig.nodes) ? fileConfig.nodes : []
+  for (const addr of staticNodes) {
+    peers.push({ id: addr, addr, latency: 0 })
+  }
+
+  // Discover nodes via DHT
   for await (const prov of libp2p.contentRouting.findProviders(key, { maxTimeout: 5000 })) {
     if (prov.multiaddrs.length === 0) continue
     let latency
@@ -64,121 +69,94 @@ async function discoverProviders () {
     } catch {
       latency = Infinity
     }
-    let rewardAddress
-    try {
-      const record = await libp2p.contentRouting.get(key)
-      const info = JSON.parse(decoder.decode(record))
-      if (info.addr === prov.multiaddrs[0].toString()) rewardAddress = info.rewardAddress
-    } catch {}
     console.log(`Tentative de connexion au pair ${prov.id.toString()} - Latence ${latency}ms`)
-    peers.push({ id: prov.id, addr: prov.multiaddrs[0], latency, rewardAddress })
+    peers.push({ id: prov.id.toString(), addr: prov.multiaddrs[0], latency })
   }
-  peers.sort((a, b) => a.latency - b.latency)
-  return peers
+
+  // Deduplicate peers by address
+  const seen = new Set()
+  const unique = []
+  for (const p of peers) {
+    const key = p.addr.toString()
+    if (seen.has(key)) continue
+    seen.add(key)
+    unique.push(p)
+  }
+  unique.sort((a, b) => a.latency - b.latency)
+  return unique
 }
 
-let winner
-
-function attemptPeer (peer, prompt) {
+// Send a prompt to a given peer and collect the response
+async function sendToPeer (peer, prompt) {
+  const start = Date.now()
   const controller = new AbortController()
-  const { promise: started, resolve: startedResolve, reject: startedReject } = Promise.withResolvers()
-  const { promise: finished, resolve: finishedResolve, reject: finishedReject } = Promise.withResolvers()
-  const timeout = setTimeout(() => {
-    controller.abort()
-    startedReject(new Error('timeout'))
-    finishedReject(new Error('timeout'))
-  }, 2000)
-
-  ;(async () => {
-    let first = true
-    try {
-      const stream = await libp2p.dialProtocol(peer.addr, '/ai-torrent/1/generate', { signal: controller.signal })
-      params.context = context
-      await stream.sink((async function * () {
-        yield encoder.encode(JSON.stringify({ prompt, params }) + '\n')
-      })())
-      let buffer = ''
-      outer: for await (const chunk of stream.source) {
-        const data = chunk.subarray ? chunk.subarray() : Uint8Array.from(chunk)
-        buffer += decoder.decode(data)
-        let index
-        while ((index = buffer.indexOf('\n')) !== -1) {
-          const line = buffer.slice(0, index)
-          buffer = buffer.slice(index + 1)
-          if (!line.trim()) continue
-          const msg = JSON.parse(line)
-          if (first) {
-            first = false
-            startedResolve({ peer, finished })
-            if (winner && winner !== peer) {
-              controller.abort()
-              finishedResolve()
-              return
-            }
-            if (!winner) winner = peer
-          }
-          if (winner !== peer) {
-            controller.abort()
-            finishedResolve()
-            return
-          }
-          process.stdout.write(msg.response || '')
-          if (msg.error) {
-            console.error(msg.error)
-            finishedResolve()
-            return
-          }
-          if (msg.done) {
-            context = msg.context
-            process.stdout.write('\n')
-            finishedResolve()
-            return
-          }
+  const timeout = setTimeout(() => controller.abort(), 2000)
+  const result = { peer, ok: false, response: '', duration: 0 }
+  console.log(`Envoi de la requête au pair ${peer.id}`)
+  try {
+    const stream = await libp2p.dialProtocol(peer.addr, '/ai-torrent/1/generate', { signal: controller.signal })
+    params.context = context
+    await stream.sink((async function * () {
+      yield encoder.encode(JSON.stringify({ prompt, params }) + '\n')
+    })())
+    let buffer = ''
+    for await (const chunk of stream.source) {
+      const data = chunk.subarray ? chunk.subarray() : Uint8Array.from(chunk)
+      buffer += decoder.decode(data)
+      let index
+      while ((index = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, index)
+        buffer = buffer.slice(index + 1)
+        if (!line.trim()) continue
+        const msg = JSON.parse(line)
+        if (msg.response) result.response += msg.response
+        if (msg.error) {
+          console.error(`Erreur du noeud ${peer.id}:`, msg.error)
+          return result
+        }
+        if (msg.done) {
+          result.ok = true
+          result.context = msg.context
         }
       }
-      finishedResolve()
-    } catch (err) {
-      if (first) startedReject(err)
-      finishedReject(err)
-    } finally {
-      clearTimeout(timeout)
     }
-  })()
-
-  return { peer, controller, started, finished }
+  } catch (err) {
+    console.error(`Erreur durant la requête auprès du pair ${peer.id}:`, err.message)
+  } finally {
+    clearTimeout(timeout)
+    result.duration = Date.now() - start
+  }
+  return result
 }
 
+// Send the prompt to all discovered peers in parallel and combine responses
 async function sendPrompt (prompt) {
   const providers = await discoverProviders()
   if (!providers.length) {
     console.error('Aucun pair n\'a répondu. Réessayez plus tard.')
     return
   }
-  const attempts = providers.slice(0, 3).map(p => attemptPeer(p, prompt))
-  let selected
-  try {
-    selected = await Promise.any(attempts.map(a => a.started))
-  } catch (err) {
+
+  const results = await Promise.all(providers.map(p => sendToPeer(p, prompt)))
+  const successes = results.filter(r => r.ok)
+
+  for (const r of results) {
+    if (r.ok) {
+      console.log(`Réponse reçue de ${r.peer.id} en ${r.duration}ms`)
+    } else {
+      console.log(`Aucune réponse de ${r.peer.id}`)
+    }
+  }
+
+  if (!successes.length) {
     console.error('Aucun pair n\'a répondu. Réessayez plus tard.')
     return
   }
-  for (const a of attempts) {
-    if (a.peer !== selected.peer) a.controller.abort()
-  }
-  await selected.finished
-  const peerId = selected.peer.id.toString()
-  const count = (requestCounts.get(peerId) || 0) + 1
-  requestCounts.set(peerId, count)
-  if (selected.peer.rewardAddress && count % 10 === 0) {
-    try {
-      const amount = 10n ** BigInt(decimals)
-      const tx = await tokenContract.methods.transfer(selected.peer.rewardAddress, amount).send({ from: wallet.address })
-      console.log(`Reward tx: ${tx.transactionHash}`)
-    } catch (err) {
-      console.error('Reward transfer failed:', err)
-    }
-  }
-  winner = undefined
+
+  // combine responses from all successful peers
+  const combined = successes.map(r => r.response).join('\n')
+  context = successes[0].context
+  process.stdout.write(combined + '\n')
 }
 
 while (true) {

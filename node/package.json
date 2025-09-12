@@ -13,7 +13,6 @@
     "@libp2p/websockets": "*",
     "@libp2p/bootstrap": "*",
     "libp2p": "*",
-    "yaml": "*",
-    "web3": "^1.10.0"
+    "yaml": "*"
   }
 }

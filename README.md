@@ -13,14 +13,21 @@ Ce projet contient deux packages Node.js utilisant [libp2p](https://libp2p.io/) 
 
 ## Fichier de configuration
 
-Dupliquez `config.example.json` en `config.json` et renseignez les valeurs :
+Dupliquez `client/config.example.json` en `client/config.json` et renseignez **au moins** une adresse pour qu'au
+moins un pair soit contacté lors de l'amorçage :
 
 ```json
 {
-  "bootstrapAddr": "", // optionnel
-  "nodes": []            // liste de nœuds connus optionnelle
+  "bootstrapAddr": "/ip4/203.0.113.1/tcp/4001/p2p/QmBootstrapPeer",
+  "nodes": [
+    "/ip4/203.0.113.2/tcp/4001/p2p/QmAnotherPeer"
+  ]
 }
 ```
+
+`bootstrapAddr` permet de joindre un nœud de bootstrap connu. À défaut, renseignez une liste de `nodes` connus. Sans
+l'une de ces valeurs, la découverte via la DHT est indisponible et seuls les nœuds listés statiquement peuvent être
+utilisés.
 
 Ce fichier est lu automatiquement par le client pour éviter l'utilisation de variables d'environnement.
 

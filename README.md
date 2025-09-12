@@ -29,27 +29,32 @@ moins un pair soit contacté lors de l'amorçage :
 l'une de ces valeurs, la découverte via la DHT est indisponible et seuls les nœuds listés statiquement peuvent être
 utilisés.
 
-Ce fichier est lu automatiquement par le client pour éviter l'utilisation de variables d'environnement.
+Le client charge automatiquement ce fichier s'il existe, lit le fichier `client/daemon.addr` écrit par le démon pour connaître son adresse locale et tient compte de la variable d'environnement `BOOTSTRAP_ADDR` si elle est définie.
 
 ## Variables d'environnement
 
-- `PORT` : port d'écoute du démon. Par défaut, le démon utilise le port configuré dans `node/config.yaml` (55781). Pour choisir un port stable, définissez cette variable avant de lancer le démon, par exemple : `PORT=60000 npm run start --prefix node`. Le client utilise également cette valeur pour se connecter au démon local lorsque `AI_TORRENT_ADDR` n'est pas fournie.
-- `AI_TORRENT_ADDR` : adresse explicite du fournisseur. Ignorée si l'option `--discover` est utilisée.
+- `PORT` : port d'écoute du démon. Par défaut, le démon utilise le port configuré dans `node/config.yaml` (55781). Pour choisir un port stable, définissez cette variable avant de lancer le démon, par exemple : `PORT=60000 npm run start --prefix node`.
+- `BOOTSTRAP_ADDR` : adresse d'un pair de bootstrap pour la découverte via la DHT. Cette variable est optionnelle et est lue automatiquement par le démon et le client.
+
 ## Démarrage rapide
+
+Ces commandes démarrent un nœud local et permettent d'envoyer une requête sans configuration manuelle.
 
 ```bash
 # depuis la racine du repo
-# installation des dépendances
 npm install --prefix client
 npm install --prefix node
 
-# lancement du démon
+# lancement du démon (terminal 1)
 npm run start --prefix node
-
-# envoi d'une requête (découverte automatique)
-npm run ask --prefix client -- --discover "Bonjour, qui es-tu ?"
 ```
 
-Le démon doit avoir accès à une instance locale d'[Ollama](https://github.com/ollama/ollama) accessible sur `http://127.0.0.1:11434`.
+Dans un autre terminal :
 
-L'option `--discover` force le client à ignorer `AI_TORRENT_ADDR` et à découvrir l'adresse du fournisseur via le fichier `daemon.addr` ou la DHT.
+```bash
+# envoi d'une requête
+npm run ask --prefix client
+> Bonjour, qui es-tu ?
+```
+
+Le démon doit avoir accès à une instance locale d'[Ollama](https://github.com/ollama/ollama) accessible sur `http://127.0.0.1:11434`. Le client découvre automatiquement le démon via `client/daemon.addr`, `client/config.json` et `BOOTSTRAP_ADDR` lorsqu'elle est définie.

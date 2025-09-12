@@ -9,6 +9,8 @@ import fsp from 'node:fs/promises'
 import { writeFileSync } from 'node:fs'
 import { parse } from 'yaml'
 import { generate } from './inference.js'
+import { CID } from 'multiformats/cid'
+import { sha256 } from 'multiformats/hashes/sha2'
 
 if (typeof Promise.withResolvers !== 'function') {
   Promise.withResolvers = () => {
@@ -31,10 +33,10 @@ const libp2p = await createLibp2p({
   transports: [webSockets()],
   streamMuxers: [mplex()],
   connectionEncrypters: [noise()],
-  dht: kadDHT(),
   peerDiscovery: bootstrappers.length ? [bootstrap({ list: bootstrappers })] : [],
   services: {
-    identify: identify()
+    identify: identify(),
+    dht: kadDHT()
   }
 })
 
@@ -51,7 +53,6 @@ const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 const announceKeys = config.announceKeys || [config.announceKey || 'ait:cap:mistral-q4']
 const addr = libp2p.getMultiaddrs()[0]?.toString() || ''
-const announcement = JSON.stringify({ addr, keys: announceKeys })
 
 console.log(`listening on ${addr}`)
 console.log('serving fragments:', announceKeys.join(', '))
@@ -62,7 +63,8 @@ try {
 }
 for (const key of announceKeys) {
   try {
-    await libp2p.contentRouting.put(encoder.encode(key), encoder.encode(announcement))
+    const cid = CID.createV1(0x55, await sha256.digest(encoder.encode(key)))
+    await libp2p.contentRouting.provide(cid)
     console.log(`announced ${key} at ${addr}`)
   } catch (err) {
     console.warn('Failed to announce address for', key, err)

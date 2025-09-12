@@ -60,17 +60,35 @@ async function discoverProviders () {
     peers.push({ id: addr, addr, latency: 0 })
   }
 
-  // Discover nodes via DHT
-  for await (const prov of libp2p.contentRouting.findProviders(key, { maxTimeout: 5000 })) {
-    if (prov.multiaddrs.length === 0) continue
-    let latency
+  // Discover nodes via DHT if routers are configured
+  let hasContentRouters = false
+  try {
+    const routers = libp2p.components.contentRouters
+    hasContentRouters = Array.isArray(routers) ? routers.length > 0 : routers?.size > 0
+  } catch {}
+
+  if (!hasContentRouters) {
+    console.warn('No DHT routers configured, falling back to static nodes')
+  } else {
     try {
-      latency = await libp2p.ping(prov.id)
-    } catch {
-      latency = Infinity
+      for await (const prov of libp2p.contentRouting.findProviders(key, { maxTimeout: 5000 })) {
+        if (prov.multiaddrs.length === 0) continue
+        let latency
+        try {
+          latency = await libp2p.ping(prov.id)
+        } catch {
+          latency = Infinity
+        }
+        console.log(`Tentative de connexion au pair ${prov.id.toString()} - Latence ${latency}ms`)
+        peers.push({ id: prov.id.toString(), addr: prov.multiaddrs[0], latency })
+      }
+    } catch (err) {
+      if (err.name === 'NoContentRoutersError') {
+        console.warn('No DHT routers configured, falling back to static nodes')
+      } else {
+        console.error('Error discovering nodes via DHT:', err)
+      }
     }
-    console.log(`Tentative de connexion au pair ${prov.id.toString()} - Latence ${latency}ms`)
-    peers.push({ id: prov.id.toString(), addr: prov.multiaddrs[0], latency })
   }
 
   // Deduplicate peers by address

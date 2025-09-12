@@ -34,11 +34,11 @@ const libp2p = await createLibp2p({
   transports: [webSockets()],
   streamMuxers: [mplex()],
   connectionEncrypters: [noise()],
-  dht: kadDHT(),
   peerDiscovery: bootstrappers.length ? [bootstrap({ list: bootstrappers })] : [],
   services: {
     identify: identify(),
-    ping: ping()
+    ping: ping(),
+    dht: kadDHT()
   }
 })
 

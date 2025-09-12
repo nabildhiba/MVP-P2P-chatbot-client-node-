@@ -69,8 +69,7 @@ async function discoverProviders () {
   }
 
   // Discover nodes via DHT if content routers are available
-  const routers = libp2p.components?.contentRouters
-  const hasContentRouters = Array.isArray(routers) ? routers.length > 0 : routers?.size > 0
+  const hasContentRouters = (libp2p.contentRouting?.routers?.length ?? 0) > 0
 
   if (!hasContentRouters) {
     console.warn('No content routers available; using static nodes only.')

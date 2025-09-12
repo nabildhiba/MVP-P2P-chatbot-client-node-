@@ -10,6 +10,8 @@ import { ping } from '@libp2p/ping'
 import { createInterface } from 'readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
 import { readFileSync } from 'node:fs'
+import { CID } from 'multiformats/cid'
+import { sha256 } from 'multiformats/hashes/sha2'
 
 if (typeof Promise.withResolvers !== 'function') {
   Promise.withResolvers = () => {
@@ -48,7 +50,8 @@ const rl = createInterface({ input, output })
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
-const key = encoder.encode('ait:cap:mistral-q4')
+const keyStr = 'ait:cap:mistral-q4'
+const keyCid = CID.createV1(0x55, await sha256.digest(encoder.encode(keyStr)))
 
 // Discover peers from a local daemon, a static list in config or through the DHT
 async function discoverProviders () {
@@ -75,7 +78,7 @@ async function discoverProviders () {
     console.warn('No content routers available; using static nodes only.')
   } else {
     try {
-      for await (const prov of libp2p.contentRouting.findProviders(key, { maxTimeout: 5000 })) {
+      for await (const prov of libp2p.contentRouting.findProviders(keyCid, { maxTimeout: 5000 })) {
         if (prov.multiaddrs.length === 0) continue
         let latency
         try {
